@@ -1,5 +1,5 @@
 {
-  "name": "best version Admin Dashboard . ",
+  "name": "LyncApp MOS Admin Dashboard",
   "description": "Enterprise-grade admin panel for mobility operating system management, featuring fleet tracking, revenue analytics, and compliance monitoring.",
   "requestFramePermissions": [
     "geolocation"

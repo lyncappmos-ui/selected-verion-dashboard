@@ -33,10 +33,11 @@ export const MOCK_TRIPS: Trip[] = [
 ];
 
 export const MOCK_FLEET: Vehicle[] = [
-  { registration: 'KDA 123A', route: 'Nairobi-Thika', branch: 'Main', status: 'active', lastActive: '2 mins ago', driver: 'John Doe' },
-  { registration: 'KDB 456B', route: 'CBD-Westlands', branch: 'West', status: 'active', lastActive: 'Now', driver: 'Jane Smith' },
-  { registration: 'KDC 789C', route: 'Nairobi-Nakuru', branch: 'Main', status: 'idle', lastActive: '1 hr ago', driver: 'Peter Kamau' },
-  { registration: 'KDD 012D', route: 'Nairobi-Thika', branch: 'Main', status: 'maintenance', lastActive: 'Yesterday', driver: 'N/A' },
+  // Added required trustScore property to satisfy Vehicle interface
+  { registration: 'KDA 123A', route: 'Nairobi-Thika', branch: 'Main', status: 'active', lastActive: '2 mins ago', driver: 'John Doe', trustScore: 98 },
+  { registration: 'KDB 456B', route: 'CBD-Westlands', branch: 'West', status: 'active', lastActive: 'Now', driver: 'Jane Smith', trustScore: 94 },
+  { registration: 'KDC 789C', route: 'Nairobi-Nakuru', branch: 'Main', status: 'idle', lastActive: '1 hr ago', driver: 'Peter Kamau', trustScore: 82 },
+  { registration: 'KDD 012D', route: 'Nairobi-Thika', branch: 'Main', status: 'maintenance', lastActive: 'Yesterday', driver: 'N/A', trustScore: 90 },
 ];
 
 export const MOCK_SMS: SMSMetrics = {

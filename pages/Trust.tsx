@@ -1,106 +1,100 @@
 
 import React, { useEffect, useState } from 'react';
-import { mosApi } from '../services/api';
-import { Shield, ShieldAlert, Zap, Search } from 'lucide-react';
+import { mosClient } from '../services/mosClient';
+import { ShieldCheck, TrendingUp, AlertTriangle, Search, Fingerprint } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 
 export const Trust: React.FC = () => {
-  const [summary, setSummary] = useState<any>(null);
+  const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    mosApi.getTrustSummary().then(setSummary);
+    mosClient.getTrustScores().then(setData);
   }, []);
 
-  if (!summary) return <div>Analyzing Compliance...</div>;
+  if (!data) return <div className="p-12 text-center animate-pulse">Consulting Trust Engine...</div>;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Trust & Compliance</h1>
-        <p className="text-slate-500">Integrity scores and behavior analysis for operational safety.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-          <div className="w-24 h-24 rounded-full border-8 border-emerald-100 flex items-center justify-center mb-4 relative">
-            <span className="text-3xl font-black text-emerald-600">{summary.averageTrustScore}</span>
-            <div className="absolute -bottom-1 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-              Excellent
-            </div>
-          </div>
-          <h3 className="font-bold text-slate-800">System Trust Index</h3>
-          <p className="text-slate-400 text-xs mt-1">Based on 1,240 completed trips today</p>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Trust & Integrity Engine</h1>
+          <p className="text-slate-500 text-sm">Behavioral scoring and compliance monitoring for operational safety.</p>
         </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Zap size={20} /></div>
-            <h3 className="font-bold text-slate-800">Deviations</h3>
-          </div>
-          <p className="text-4xl font-bold text-slate-800">{summary.deviations}</p>
-          <p className="text-sm text-slate-500 mt-2">Route timing & path variances</p>
-          <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs">
-            <span className="text-rose-500 font-bold">+12% increase</span>
-            <span className="text-slate-400">vs yesterday</span>
-          </div>
-        </div>
-
-        <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-rose-100 text-rose-600 rounded-lg"><ShieldAlert size={20} /></div>
-            <h3 className="font-bold text-rose-900">Fraud Alerts</h3>
-          </div>
-          <p className="text-4xl font-bold text-rose-700">{summary.anomalies}</p>
-          <p className="text-sm text-rose-600 mt-2">Active investigations required</p>
-          <button className="mt-6 w-full py-2 bg-rose-600 text-white rounded-lg font-bold text-sm shadow-md hover:bg-rose-700">
-            View Fraud Queue
+        <div className="flex gap-2">
+          <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center gap-2">
+            <Search size={16} /> Audit Search
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800">Vehicle Integrity Scores</h3>
-          <div className="flex gap-2">
-            <button className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">By Conductor</button>
-            <button className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg">By Vehicle</button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center">
+          <div className="w-28 h-28 rounded-full border-[10px] border-emerald-50 flex items-center justify-center mb-6 relative">
+            <span className="text-4xl font-black text-emerald-600">{data.average}%</span>
+            <div className="absolute -bottom-2 bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg">
+              NOMINAL
+            </div>
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">Aggregate SACCO Trust Index</h3>
+          <p className="text-slate-400 text-xs mt-2 max-w-xs leading-relaxed">
+            Computed by MOS Core based on route fidelity, timing adherence, and financial honesty.
+          </p>
+        </div>
+
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">7-Day Integrity Trend</h3>
+            <Fingerprint size={16} className="text-slate-200" />
+          </div>
+          <div className="h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.trends}>
+                <XAxis dataKey="day" hide />
+                <YAxis hide domain={[0, 100]} />
+                <Tooltip 
+                  cursor={{fill: '#f8fafc'}}
+                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)'}}
+                />
+                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  {data.trends.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.score > 90 ? '#10b981' : '#f59e0b'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-        <div className="p-0">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50 text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                <th className="px-8 py-3">Vehicle</th>
-                <th className="px-8 py-3">Assigned Crew</th>
-                <th className="px-8 py-3 text-center">Trust Score</th>
-                <th className="px-8 py-3">Last Violation</th>
-                <th className="px-8 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm divide-y divide-slate-100">
-              {[
-                { v: 'KDA 123A', c: 'David M.', s: 98, l: 'None' },
-                { v: 'KDB 456B', c: 'Sarah O.', s: 94, l: '10 min idle' },
-                { v: 'KDC 789C', c: 'James K.', s: 82, l: 'Route Deviation' },
-                { v: 'KDD 012D', c: 'Felix W.', s: 89, l: 'Late Start' },
-              ].map(row => (
-                <tr key={row.v} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-8 py-4 font-bold text-slate-700">{row.v}</td>
-                  <td className="px-8 py-4 text-slate-600">{row.c}</td>
-                  <td className="px-8 py-4">
-                    <div className="flex justify-center">
-                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${row.s > 90 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {row.s}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-4 text-slate-400 italic">{row.l}</td>
-                  <td className="px-8 py-4">
-                    <button className="text-blue-600 font-bold text-xs hover:underline">Monitor Live</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 flex gap-4">
+          <AlertTriangle className="text-rose-600 shrink-0" size={24} />
+          <div>
+            <h4 className="font-bold text-rose-900">Active Compliance Flags: {data.anomalies}</h4>
+            <p className="text-xs text-rose-700 mt-1">MOS Core detected 2 route deviations exceeding the 200m variance threshold today.</p>
+            <button className="mt-4 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-[10px] font-bold shadow-md hover:bg-rose-700 transition-all uppercase tracking-widest">Investigate Now</button>
+          </div>
+        </div>
+        
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+           <div className="flex items-center justify-between mb-6">
+             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Audit Readiness Indicators</h3>
+             <ShieldCheck size={16} className="text-emerald-500" />
+           </div>
+           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+             <div className="p-4 bg-slate-50 rounded-xl">
+               <p className="text-[10px] font-bold text-slate-400 uppercase">Fidelity</p>
+               <p className="text-xl font-bold text-slate-800">98.4%</p>
+             </div>
+             <div className="p-4 bg-slate-50 rounded-xl">
+               <p className="text-[10px] font-bold text-slate-400 uppercase">Filing</p>
+               <p className="text-xl font-bold text-slate-800">100%</p>
+             </div>
+             <div className="p-4 bg-slate-50 rounded-xl">
+               <p className="text-[10px] font-bold text-slate-400 uppercase">Integrity</p>
+               <p className="text-xl font-bold text-slate-800">92.1%</p>
+             </div>
+           </div>
         </div>
       </div>
     </div>

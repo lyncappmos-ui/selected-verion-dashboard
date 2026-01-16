@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { mosApi } from '../services/api';
+import { mosClient } from '../services/mosClient';
 import { SMSMetrics } from '../types';
 import { MessageSquare, AlertCircle, Info } from 'lucide-react';
 
@@ -8,97 +8,102 @@ export const SMSDashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<SMSMetrics | null>(null);
 
   useEffect(() => {
-    mosApi.getSMSMetrics().then(setMetrics);
+    mosClient.getSMSMetrics().then(setMetrics);
   }, []);
 
-  if (!metrics) return <div>Loading SMS Data...</div>;
+  if (!metrics) return <div className="p-12 text-center animate-pulse text-slate-400 font-bold">Querying Communication Ledger...</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">SMS & Cost Dashboard</h1>
-          <p className="text-slate-500">Monitor automated system communication efficiency.</p>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">SMS & Cost Analysis</h1>
+          <p className="text-slate-500 text-sm">Monitor automated system communication efficiency and budgets.</p>
         </div>
-        <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-xs font-bold border border-blue-100">
-          Current Balance: 42,400 Units
+        <div className="bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">
+          Quota: 42,400 Units Remaining
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Total Sent</p>
-          <p className="text-3xl font-bold text-slate-800">{metrics.sent.toLocaleString()}</p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Total Sent</p>
+          <p className="text-3xl font-bold text-slate-800 tracking-tighter">{metrics.sent.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Success Rate</p>
-          <p className="text-3xl font-bold text-emerald-600">{metrics.successRate}%</p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Delivery Success</p>
+          <p className="text-3xl font-bold text-emerald-600 tracking-tighter">{metrics.successRate}%</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Total Cost (MTD)</p>
-          <p className="text-3xl font-bold text-slate-800">KES {metrics.totalCost.toLocaleString()}</p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Total Cost (MTD)</p>
+          <p className="text-3xl font-bold text-slate-800 tracking-tighter">KES {metrics.totalCost.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200">
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Cost / Ticket</p>
-          <p className="text-3xl font-bold text-blue-600">KES {metrics.costPerTicket}</p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-b-4 border-b-blue-600">
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Avg Cost / Unit</p>
+          <p className="text-3xl font-bold text-blue-600 tracking-tighter">KES {metrics.costPerTicket}</p>
         </div>
       </div>
 
-      <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex gap-3 text-amber-800">
-        <AlertCircle className="shrink-0" size={20} />
+      <div className="bg-amber-50 border border-amber-100 p-6 rounded-2xl flex gap-4 text-amber-800 shadow-sm">
+        <div className="w-10 h-10 bg-amber-200/50 rounded-xl flex items-center justify-center shrink-0">
+          <AlertCircle size={20} className="text-amber-700" />
+        </div>
         <div>
-          <p className="text-sm font-bold">SMS Quota Warning</p>
-          <p className="text-xs opacity-90 mt-0.5">At current usage rates, you will reach your monthly limit in 5 days. Consider topping up.</p>
+          <p className="text-sm font-bold">Low Quota Warning</p>
+          <p className="text-xs opacity-90 mt-1 font-medium leading-relaxed">At current consumption rates for the morning peak, you will reach your monthly limit in approx. 4.2 days. MOS Core recommends top-up intent.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-2xl border border-slate-200">
-          <div className="flex items-center gap-2 mb-6">
-            <h3 className="font-bold text-slate-800">Delivery Status Breakdown</h3>
-            <Info size={14} className="text-slate-400" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-8">
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Infrastructure Breakdown</h3>
+            <Info size={14} className="text-slate-300" />
           </div>
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div>
-              <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-slate-500">Delivered</span>
-                <span className="font-bold text-slate-800">15,280</span>
+              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                <span>Successful Handover</span>
+                <span className="text-emerald-600">98.5%</span>
               </div>
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-[98.5%]"></div>
+              <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                <div className="h-full bg-emerald-500 rounded-full w-[98.5%] shadow-sm"></div>
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-slate-500">Failed (No Signal)</span>
-                <span className="font-bold text-slate-800">92</span>
+              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                <span>Network Failure</span>
+                <span className="text-rose-600">1.2%</span>
               </div>
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-rose-500 w-[1.5%]"></div>
+              <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                <div className="h-full bg-rose-500 rounded-full w-[1.2%]"></div>
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1.5">
-                <span className="text-slate-500">Pending</span>
-                <span className="font-bold text-slate-800">28</span>
+              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                <span>Queued / Pending</span>
+                <span className="text-blue-600">0.3%</span>
               </div>
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-300 w-[0.8%]"></div>
+              <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                <div className="h-full bg-blue-600 rounded-full w-[0.3%]"></div>
               </div>
             </div>
           </div>
         </div>
         
-        <div className="bg-slate-800 text-white p-8 rounded-2xl shadow-xl flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold mb-2">Automated Optimization</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Our AI system has identified that sending SMS notifications for short-haul trips (under 5km) currently costs KES 12,000 monthly.
+        <div className="bg-slate-900 text-white p-10 rounded-3xl shadow-2xl flex flex-col justify-between border border-slate-800 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 opacity-10">
+            <MessageSquare size={200} />
+          </div>
+          <div className="relative">
+            <h3 className="text-xl font-bold mb-3 tracking-tight">Cost Optimisation Identified</h3>
+            <p className="text-slate-400 text-sm leading-relaxed font-medium">
+              MOS Core Analytics suggests disabling automated SMS alerts for trips &lt; 2km. This will reduce monthly overhead by approx. <span className="text-emerald-400 font-bold">KES 18,500</span> without affecting trust scores.
             </p>
           </div>
-          <div className="mt-8">
-            <button className="w-full py-3 bg-white text-slate-900 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors">
-              Apply Recommended Limits
+          <div className="mt-12 relative">
+            <button className="w-full py-4 bg-white text-slate-900 rounded-2xl font-bold text-sm hover:bg-blue-50 transition-all shadow-xl shadow-black/20 active:scale-95">
+              Execute Optimisation Intent
             </button>
           </div>
         </div>

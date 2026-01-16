@@ -1,15 +1,15 @@
 
 import React, { useEffect, useState } from 'react';
-import { mosApi } from '../services/api';
+import { mosClient } from '../services/mosClient';
 import { Vehicle } from '../types';
-import { Map, RefreshCw, MoreVertical, Plus } from 'lucide-react';
+import { Map, RefreshCw, MoreVertical, Plus, Truck } from 'lucide-react';
 
 export const Fleet: React.FC = () => {
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    mosApi.getFleet().then(res => {
+    mosClient.getVehicles().then(res => {
       setFleet(res);
       setLoading(false);
     });
@@ -29,58 +29,62 @@ export const Fleet: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Fleet Management</h1>
-          <p className="text-slate-500">Track vehicle status and manage route assignments.</p>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Fleet Control</h1>
+          <p className="text-slate-500 text-sm">Track vehicle lifecycle status and system assignments.</p>
         </div>
-        <button className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all shadow-md">
-          <Plus size={20} /> Add New Vehicle
+        <button className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all text-sm">
+          <Plus size={18} /> Register Vehicle
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-           [...Array(3)].map((_, i) => <div key={i} className="h-48 bg-slate-200 rounded-2xl animate-pulse"></div>)
+           [...Array(3)].map((_, i) => <div key={i} className="h-64 bg-slate-200 rounded-2xl animate-pulse"></div>)
         ) : fleet.map((vehicle) => (
-          <div key={vehicle.registration} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group">
+          <div key={vehicle.registration} className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Truck size={100} />
+            </div>
+            
             <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-slate-50 text-slate-500 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-inner">
                   <Map size={24} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-slate-800 uppercase">{vehicle.registration}</h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <h3 className="font-bold text-xl text-slate-800 uppercase tracking-tighter">{vehicle.registration}</h3>
+                  <div className="flex items-center gap-2 mt-1">
                     <span className={`w-2 h-2 rounded-full ${getStatusIndicator(vehicle.status)}`}></span>
-                    <span className="text-xs font-bold text-slate-500 capitalize tracking-tight">{vehicle.status}</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{vehicle.status}</span>
                   </div>
                 </div>
               </div>
-              <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400">
+              <button className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 hover:text-slate-600 transition-colors">
                 <MoreVertical size={20} />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Assigned Route</span>
-                <span className="font-semibold text-slate-700">{vehicle.route}</span>
+            <div className="space-y-4 py-4 border-y border-slate-50">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-bold uppercase tracking-widest">Route</span>
+                <span className="font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">{vehicle.route}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Hub Branch</span>
-                <span className="font-semibold text-slate-700">{vehicle.branch}</span>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-bold uppercase tracking-widest">Hub</span>
+                <span className="font-bold text-slate-800">{vehicle.branch}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Last Active</span>
-                <span className="font-medium text-blue-600">{vehicle.lastActive}</span>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-bold uppercase tracking-widest">Trust</span>
+                <span className={`font-bold px-2 py-0.5 rounded ${vehicle.trustScore > 90 ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>{vehicle.trustScore}%</span>
               </div>
             </div>
 
-            <div className="mt-6 flex gap-2">
-              <button className="flex-1 py-2 text-xs font-bold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
-                <RefreshCw size={14} /> Reassign Route
+            <div className="mt-6 flex gap-3">
+              <button className="flex-1 py-3 text-[10px] font-black uppercase bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md active:scale-95">
+                <RefreshCw size={14} /> Reassign
               </button>
-              <button className="px-4 py-2 text-xs font-bold bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-                View History
+              <button className="px-4 py-3 text-[10px] font-black uppercase bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors active:scale-95">
+                History
               </button>
             </div>
           </div>

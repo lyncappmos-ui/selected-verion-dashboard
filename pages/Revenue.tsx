@@ -1,84 +1,133 @@
 
-import React from 'react';
-import { DollarSign, FileText, Download, TrendingUp } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { mosClient } from '../services/mosClient';
+import { RevenueSummary } from '../types';
+// Added Activity to imports from lucide-react
+import { DollarSign, CheckCircle2, Database, ShieldAlert, Lock, Unlock, Activity } from 'lucide-react';
 
 export const Revenue: React.FC = () => {
+  const [data, setData] = useState<RevenueSummary | null>(null);
+
+  useEffect(() => {
+    mosClient.getRevenueSummary().then(setData);
+  }, []);
+
+  if (!data) return <div className="p-12 text-center text-slate-400">Loading financials...</div>;
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Revenue & Reconciliation</h1>
-          <p className="text-slate-500">Financial auditing and income distribution reporting.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Revenue Reconciliation</h1>
+          <p className="text-slate-500 text-sm">Auditing SACCO income distributions and operational day closures.</p>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold flex items-center gap-2 text-slate-600 hover:bg-slate-50 transition-colors">
-            <FileText size={18} /> Daily Report
-          </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md">
-            <Download size={18} /> Export CSV
-          </button>
+        <div className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+          data.dailyClosureStatus === 'open' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-700 border-slate-100'
+        }`}>
+          {data.dailyClosureStatus === 'open' ? <Unlock size={16} /> : <Lock size={16} />}
+          DAY STATUS: {data.dailyClosureStatus.toUpperCase()}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="p-2 w-fit bg-emerald-50 text-emerald-600 rounded-lg mb-4">
-            <DollarSign size={24} />
-          </div>
-          <h3 className="text-slate-500 text-sm font-medium">Net Revenue (MTD)</h3>
-          <p className="text-2xl font-bold text-slate-800 mt-1">KES 4.2M</p>
-          <div className="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500 w-[75%]"></div>
-          </div>
-          <p className="text-xs text-slate-400 mt-2">75% of monthly target achieved</p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="p-2 w-fit bg-blue-50 text-blue-600 rounded-lg mb-4">
-            <TrendingUp size={24} />
-          </div>
-          <h3 className="text-slate-500 text-sm font-medium">Avg. Revenue per Trip</h3>
-          <p className="text-2xl font-bold text-slate-800 mt-1">KES 2,450</p>
-          <div className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-600">
-            <span>+4.2%</span>
-            <span className="text-slate-400 font-normal">from last week</span>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total MTD Revenue</p>
+          <p className="text-3xl font-bold text-slate-800">KES {data.totalMTD.toLocaleString()}</p>
+          <div className="mt-4 flex items-center gap-2 text-xs text-emerald-600 font-bold">
+            <TrendingUp size={14} /> +14.2% from prev. month
           </div>
         </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-          <h3 className="text-slate-500 text-sm font-medium">Unreconciled Alerts</h3>
-          <p className="text-2xl font-bold text-slate-800 mt-1">12 Anomalies</p>
-          <button className="mt-4 text-xs font-bold text-blue-600 uppercase tracking-wider hover:underline">
-            Resolve all now &rarr;
-          </button>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-blue-600">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Branch Share</p>
+          <p className="text-3xl font-bold text-slate-800">3 Hubs</p>
+          <p className="text-xs text-slate-500 mt-4">Active reconciliation in progress</p>
+        </div>
+        <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 shadow-sm">
+          <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Pending Lockouts</p>
+          <p className="text-3xl font-bold text-rose-700">KES 52,000</p>
+          <div className="mt-4 flex items-center gap-2 text-xs text-rose-600 font-bold">
+            <ShieldAlert size={14} /> 2 Vehicles restricted
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <h3 className="font-bold text-slate-800">Route-wise Performance Breakdown</h3>
-        </div>
-        <div className="p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-8 flex items-center gap-2">
+            <Building2 size={16} /> Branch Breakdown
+          </h3>
           <div className="space-y-6">
-            {[
-              { route: 'Nairobi - Thika', revenue: 1250000, color: 'bg-blue-500' },
-              { route: 'CBD - Westlands', revenue: 840000, color: 'bg-purple-500' },
-              { route: 'Nairobi - Nakuru', revenue: 620000, color: 'bg-amber-500' },
-              { route: 'Thika - Garissa', revenue: 320000, color: 'bg-slate-500' },
-            ].map(item => (
-              <div key={item.route} className="space-y-2">
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-slate-700">{item.route}</span>
-                  <span className="text-slate-900 font-bold">KES {item.revenue.toLocaleString()}</span>
+            {data.byBranch.map(b => (
+              <div key={b.branch} className="space-y-2">
+                <div className="flex justify-between text-sm font-bold text-slate-700">
+                  <span>{b.branch}</span>
+                  <span>KES {b.amount.toLocaleString()}</span>
                 </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${item.color}`} style={{ width: `${(item.revenue / 1250000) * 100}%` }}></div>
+                <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${(b.amount / data.totalMTD) * 100}%` }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-8 flex items-center gap-2">
+            <Activity size={16} /> Segment Performance
+          </h3>
+          <div className="space-y-6">
+            {data.bySegment.map(s => (
+              <div key={s.segment} className="space-y-2">
+                <div className="flex justify-between text-sm font-bold text-slate-700">
+                  <span>{s.segment}</span>
+                  <span>KES {s.amount.toLocaleString()}</span>
+                </div>
+                <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-600 transition-all duration-1000" style={{ width: `${(s.amount / data.totalMTD) * 100}%` }}></div>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      <div className="bg-slate-900 text-white p-8 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800">
+        <div className="flex items-center gap-6">
+          <div className="p-4 bg-slate-800 rounded-2xl text-blue-400 border border-slate-700">
+            <Database size={32} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold">Cryptographic Day-End Verification</h3>
+            <p className="text-slate-400 text-sm mt-1 max-w-lg leading-relaxed">
+              All revenue state for the current operational window is hashed and anchored to the LyncApp MOS Core ledger. This process ensures absolute finality and auditability.
+            </p>
+          </div>
+        </div>
+        <div className="text-center md:text-right bg-slate-800/50 p-4 rounded-xl border border-slate-800 min-w-[200px]">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active State Hash</p>
+          <p className="font-mono text-[10px] text-blue-400 mt-2 truncate max-w-[180px] mx-auto md:mx-0">{data.blockchainHash || '---'}</p>
+          <button className="mt-4 text-[10px] font-black uppercase text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">Verify Ledger</button>
+        </div>
+      </div>
     </div>
   );
 };
+
+const TrendingUp: React.FC<{ size?: number; className?: string }> = ({ size = 20, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+    <polyline points="17 6 23 6 23 12" />
+  </svg>
+);
+
+const Building2: React.FC<{ size?: number; className?: string }> = ({ size = 20, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+    <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+    <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+    <path d="M10 6h4" />
+    <path d="M10 10h4" />
+    <path d="M10 14h4" />
+    <path d="M10 18h4" />
+  </svg>
+);
