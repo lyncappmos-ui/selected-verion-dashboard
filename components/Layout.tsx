@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, MapPin, Building2, Truck, Users, 
-  Banknote, ShieldCheck, Settings, Menu, Bell, User, LogOut
+  Banknote, ShieldCheck, Settings, Menu, Bell, User, LogOut, Link2, Link2Off
 } from 'lucide-react';
+import { isBridgeActive } from '../services/mosClient';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +15,15 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(true);
+  const [bridgeStatus, setBridgeStatus] = useState(false);
+
+  useEffect(() => {
+    // Check bridge status periodically
+    const timer = setInterval(() => {
+      setBridgeStatus(isBridgeActive());
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   const menuItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Overview' },
@@ -66,9 +76,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
       {/* Main Content Area */}
       <div className={`flex-1 transition-all duration-300 ${isOpen ? 'ml-64' : 'ml-20'}`}>
         <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
-          <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">
-            <Menu size={20} />
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">
+              <Menu size={20} />
+            </button>
+            
+            {/* MOS Core Status Badge */}
+            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${
+              bridgeStatus 
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                : 'bg-amber-50 text-amber-600 border-amber-100'
+            }`}>
+              {bridgeStatus ? <Link2 size={12} /> : <Link2Off size={12} />}
+              {bridgeStatus ? 'MOS Connected' : 'Bridge Simulated'}
+            </div>
+          </div>
           
           <div className="flex items-center gap-6">
             <div className="hidden sm:flex flex-col items-end">

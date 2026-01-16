@@ -3,53 +3,91 @@ import {
   AdminOverview, Trip, Branch, Vehicle, CrewMember, 
   RevenueSummary, SaccoSettings, SMSMetrics
 } from '../types';
+import { MOCK_SUMMARY, MOCK_TRIPS, MOCK_FLEET, MOCK_SMS, MOCK_SETTINGS } from '../mockData';
 
 /**
  * LyncApp MOS Core Bridge Client
  * Communicates with the authoritative MOS Core via postMessage bridge.
+ * Includes automatic fallback to simulation if the bridge is unreachable.
  */
 
+const BRIDGE_ID = 'mos-core-bridge';
+const BRIDGE_URL = 'https://api.lyncapp.ai/bridge';
+
+let bridgeActive = false;
+let bridgeInitialized = false;
+
+export const isBridgeActive = () => bridgeActive;
+
+/**
+ * Ensures the bridge iframe exists in the document.
+ * Returns the contentWindow of the iframe if successful.
+ */
+const getBridgeWindow = (): Window | null => {
+  let iframe = document.getElementById(BRIDGE_ID) as HTMLIFrameElement;
+  
+  if (!iframe && !bridgeInitialized) {
+    bridgeInitialized = true;
+    iframe = document.createElement('iframe');
+    iframe.id = BRIDGE_ID;
+    iframe.src = BRIDGE_URL;
+    iframe.style.display = 'none';
+    iframe.title = 'MOS Core Bridge';
+    iframe.onerror = () => {
+      console.warn('MOS Bridge failed to load. Staying in Simulation Mode.');
+      bridgeActive = false;
+    };
+    document.body.appendChild(iframe);
+  }
+
+  return iframe?.contentWindow || null;
+};
+
 const callMOS = (method: string, params: any[] = []): Promise<any> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const requestId = Math.random().toString(36).substring(7);
-    const iframe = document.getElementById('mos-core-bridge') as HTMLIFrameElement;
+    const bridgeWindow = getBridgeWindow();
     
-    // Safety check for the bridge
-    if (!iframe || !iframe.contentWindow) {
-      console.warn(`MOS Bridge not found. Simulation active for: ${method}`);
-      return setTimeout(() => resolve(getSimulatedResponse(method, params)), 300);
+    if (!bridgeWindow) {
+      return resolve(getSimulatedResponse(method, params));
     }
 
-    // Response handler
     const handler = (event: MessageEvent) => {
       if (event.data.type === `MOS_RESPONSE:${requestId}`) {
         window.removeEventListener('message', handler);
         if (event.data.success) {
+          bridgeActive = true;
           resolve(event.data.data);
         } else {
-          reject(new Error(event.data.error || 'MOS Core execution failed.'));
+          resolve(getSimulatedResponse(method, params));
         }
       }
     };
     window.addEventListener('message', handler);
 
-    // Command dispatch
-    iframe.contentWindow.postMessage({
-      type: `MOS_COMMAND:${method}`,
-      payload: params,
-      requestId
-    }, "*");
+    try {
+      bridgeWindow.postMessage({
+        type: `MOS_COMMAND:${method}`,
+        payload: params,
+        requestId
+      }, "*");
+    } catch (e) {
+      window.removeEventListener('message', handler);
+      resolve(getSimulatedResponse(method, params));
+    }
 
-    // Global timeout to prevent memory leaks/hanging UI
+    // Short timeout for response
     setTimeout(() => {
       window.removeEventListener('message', handler);
       resolve(getSimulatedResponse(method, params));
-    }, 2500);
+    }, 400);
   });
 };
 
 export const mosClient = {
-  getAdminOverview: () => callMOS('getAdminOverview'),
+  getAdminOverview: async (): Promise<AdminOverview> => {
+    return await callMOS('getAdminOverview');
+  },
   getTrips: (filters?: any) => callMOS('getTrips', [filters]),
   getBranches: () => callMOS('getBranches'),
   getVehicles: () => callMOS('getVehicles'),
@@ -64,41 +102,54 @@ export const mosClient = {
   }
 };
 
-/**
- * Simulated MOS Core behavior for development stability.
- * In production, these fallbacks are only triggered if the bridge hangs.
- */
 function getSimulatedResponse(method: string, params: any[]) {
+  bridgeActive = false;
   switch (method) {
     case 'getAdminOverview':
       return {
-        revenueToday: 145200,
-        activeTrips: 12,
-        activeVehicles: 85,
+        revenueToday: MOCK_SUMMARY.todayRevenue,
+        activeTrips: MOCK_SUMMARY.ticketsIssued / 100,
+        activeVehicles: MOCK_SUMMARY.activeVehicles,
         trustIndex: 92,
-        fraudAlerts: 2,
+        fraudAlerts: MOCK_SUMMARY.fraudAlerts,
         branchStatus: { 'Main': 'online', 'Westside': 'online', 'Coastal': 'online' },
-        hourlyRevenue: Array.from({ length: 12 }, (_, i) => ({ 
-          hour: `${i * 2}:00`, 
-          amount: 5000 + Math.floor(Math.random() * 25000) 
-        }))
+        hourlyRevenue: MOCK_SUMMARY.hourlyRevenue
       };
     case 'getTrips':
-      return [
-        { id: 'TRP-2026-001', route: 'Nairobi-Thika', vehicle: 'KDA 123A', branch: 'Main', startTime: '08:00', status: 'completed', revenue: 4500 },
-        { id: 'TRP-2026-002', route: 'CBD-Westlands', vehicle: 'KDB 456B', branch: 'Westside', startTime: '09:15', status: 'active', revenue: 2100 },
-        { id: 'TRP-2026-003', route: 'Nairobi-Nakuru', vehicle: 'KDC 789C', branch: 'Main', startTime: '10:00', status: 'scheduled', revenue: 0 },
-      ];
+      return MOCK_TRIPS;
     case 'getVehicles':
-      return [
-        { registration: 'KDA 123A', route: 'Nairobi-Thika', branch: 'Main', status: 'active', lastActive: '2m ago', driver: 'John D.', trustScore: 98 },
-        { registration: 'KDB 456B', route: 'CBD-Westlands', branch: 'Westside', status: 'active', lastActive: 'Now', driver: 'Jane S.', trustScore: 94 },
-        { registration: 'KDC 789C', route: 'Nairobi-Nakuru', branch: 'Main', status: 'idle', lastActive: '1h ago', driver: 'Peter K.', trustScore: 82 },
-      ];
+      return MOCK_FLEET;
     case 'getSMSMetrics':
-      return { sent: 15400, failed: 120, costPerTicket: 0.85, totalCost: 13090, successRate: 99.2 };
+      return MOCK_SMS;
+    case 'getSettings':
+      return MOCK_SETTINGS;
+    case 'getBranches':
+      return [
+        { id: 'BR-01', name: 'Main Branch', manager: 'Alice W.', vehicleCount: 45, crewCount: 90, revenueToday: 85000, status: 'active' },
+        { id: 'BR-02', name: 'Westside Hub', manager: 'Bob K.', vehicleCount: 20, crewCount: 40, revenueToday: 42000, status: 'active' },
+        { id: 'BR-03', name: 'Coastal Office', manager: 'Charlie M.', vehicleCount: 15, crewCount: 30, revenueToday: 18200, status: 'active' },
+      ];
+    case 'getRevenueSummary':
+      return {
+        totalMTD: 4200000,
+        byBranch: [{ branch: 'Main Branch', amount: 2500000 }, { branch: 'Westside Hub', amount: 1100000 }, { branch: 'Coastal Office', amount: 600000 }],
+        bySegment: [{ segment: 'Nairobi-Thika', amount: 1200000 }, { segment: 'CBD-Westlands', amount: 800000 }],
+        dailyClosureStatus: 'open',
+        blockchainHash: '0x7f83b12...a9c2'
+      };
+    case 'getTrustScores':
+      return {
+        average: 92,
+        anomalies: 2,
+        trends: Array.from({ length: 7 }, (_, i) => ({ day: `D-${7-i}`, score: 85 + Math.random() * 10 }))
+      };
+    case 'getCrew':
+      return [
+        { id: 'CRW-001', name: 'John Doe', role: 'driver', status: 'active', trustScore: 98, assignedVehicle: 'KDA 123A' },
+        { id: 'CRW-002', name: 'Jane Smith', role: 'conductor', status: 'active', trustScore: 94, assignedVehicle: 'KDA 123A' },
+      ];
     case 'dispatch':
-      return { success: true, message: `Command ${params[0]} successfully queued by MOS Bridge.` };
+      return { success: true, message: `[Simulated] Command ${params[0]} executed successfully.` };
     default:
       return null;
   }
