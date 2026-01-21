@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, MapPin, Building2, Truck, Users, 
-  Banknote, ShieldCheck, Settings, Menu, Bell, User, LogOut, Link2, Link2Off
+  Banknote, ShieldCheck, Settings, Menu, Bell, User, LogOut, Zap, ZapOff
 } from 'lucide-react';
 import { isBridgeActive } from '../services/mosClient';
 
@@ -15,13 +15,13 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(true);
-  const [bridgeStatus, setBridgeStatus] = useState(false);
+  const [coreStatus, setCoreStatus] = useState(false);
 
   useEffect(() => {
-    // Check bridge status periodically
+    // Monitor real-time Core status
     const timer = setInterval(() => {
-      setBridgeStatus(isBridgeActive());
-    }, 2000);
+      setCoreStatus(isBridgeActive());
+    }, 3000);
     return () => clearInterval(timer);
   }, []);
 
@@ -39,7 +39,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
   return (
     <div className="min-h-screen flex bg-slate-50 font-sans antialiased text-slate-900">
       {/* Sidebar */}
-      <aside className={`${isOpen ? 'w-64' : 'w-20'} bg-white border-r border-slate-200 fixed h-full z-40 transition-all duration-300`}>
+      <aside className={`${isOpen ? 'w-64' : 'w-20'} bg-white border-r border-slate-200 fixed h-full z-40 transition-all duration-300 shadow-sm`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
             <span className="text-white font-bold italic">L</span>
@@ -81,14 +81,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
               <Menu size={20} />
             </button>
             
-            {/* MOS Core Status Badge */}
-            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${
-              bridgeStatus 
+            {/* Live Core Status Indicator */}
+            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest transition-all ${
+              coreStatus 
                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                : 'bg-amber-50 text-amber-600 border-amber-100'
+                : 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm'
             }`}>
-              {bridgeStatus ? <Link2 size={12} /> : <Link2Off size={12} />}
-              {bridgeStatus ? 'MOS Connected' : 'Bridge Simulated'}
+              {coreStatus ? (
+                <Zap size={12} fill="currentColor" className="animate-pulse" />
+              ) : (
+                <ZapOff size={12} />
+              )}
+              {coreStatus ? 'Live Core Connected' : 'Simulated Session'}
             </div>
           </div>
           

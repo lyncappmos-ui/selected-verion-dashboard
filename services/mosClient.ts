@@ -6,104 +6,147 @@ import {
 import { MOCK_SUMMARY, MOCK_TRIPS, MOCK_FLEET, MOCK_SMS, MOCK_SETTINGS } from '../mockData';
 
 /**
- * LyncApp MOS Core Bridge Client
- * Communicates with the authoritative MOS Core via postMessage bridge.
- * Includes automatic fallback to simulation if the bridge is unreachable.
+ * LyncApp MOS Core Client
+ * Connects directly to the Vercel-hosted MOS Core API.
  */
 
-const BRIDGE_ID = 'mos-core-bridge';
-const BRIDGE_URL = 'https://api.lyncapp.ai/bridge';
-
-let bridgeActive = false;
-let bridgeInitialized = false;
-
-export const isBridgeActive = () => bridgeActive;
+const CORE_URL = "https://lyncapp-mos-core.vercel.app/api/v1";
+let coreConnected = false;
 
 /**
- * Ensures the bridge iframe exists in the document.
- * Returns the contentWindow of the iframe if successful.
+ * Returns the current connection state to the MOS Core.
  */
-const getBridgeWindow = (): Window | null => {
-  let iframe = document.getElementById(BRIDGE_ID) as HTMLIFrameElement;
-  
-  if (!iframe && !bridgeInitialized) {
-    bridgeInitialized = true;
-    iframe = document.createElement('iframe');
-    iframe.id = BRIDGE_ID;
-    iframe.src = BRIDGE_URL;
-    iframe.style.display = 'none';
-    iframe.title = 'MOS Core Bridge';
-    iframe.onerror = () => {
-      console.warn('MOS Bridge failed to load. Staying in Simulation Mode.');
-      bridgeActive = false;
-    };
-    document.body.appendChild(iframe);
-  }
+export const isBridgeActive = () => coreConnected;
 
-  return iframe?.contentWindow || null;
-};
+/**
+ * Generic Fetch Wrapper with Mock Fallback.
+ * Attempts to communicate with the live Core API; falls back to 
+ * simulation mode on any network or protocol error.
+ */
+async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
+  try {
+    const res = await fetch(`${CORE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
 
-const callMOS = (method: string, params: any[] = []): Promise<any> => {
-  return new Promise((resolve) => {
-    const requestId = Math.random().toString(36).substring(7);
-    const bridgeWindow = getBridgeWindow();
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
     
-    if (!bridgeWindow) {
-      return resolve(getSimulatedResponse(method, params));
-    }
-
-    const handler = (event: MessageEvent) => {
-      if (event.data.type === `MOS_RESPONSE:${requestId}`) {
-        window.removeEventListener('message', handler);
-        if (event.data.success) {
-          bridgeActive = true;
-          resolve(event.data.data);
-        } else {
-          resolve(getSimulatedResponse(method, params));
-        }
-      }
-    };
-    window.addEventListener('message', handler);
-
-    try {
-      bridgeWindow.postMessage({
-        type: `MOS_COMMAND:${method}`,
-        payload: params,
-        requestId
-      }, "*");
-    } catch (e) {
-      window.removeEventListener('message', handler);
-      resolve(getSimulatedResponse(method, params));
-    }
-
-    // Short timeout for response
-    setTimeout(() => {
-      window.removeEventListener('message', handler);
-      resolve(getSimulatedResponse(method, params));
-    }, 400);
-  });
-};
+    const data = await res.json();
+    coreConnected = true;
+    return data;
+  } catch (error) {
+    // Silently handle connectivity issues and trigger simulation mode
+    console.debug(`MOS Core connectivity error for ${endpoint}. Fallback to Simulation.`);
+    coreConnected = false;
+    return null;
+  }
+}
 
 export const mosClient = {
+  /**
+   * Fetches high-level operational metrics from the Core.
+   */
   getAdminOverview: async (): Promise<AdminOverview> => {
-    return await callMOS('getAdminOverview');
+    const data = await apiCall('/overview');
+    return data || getSimulatedResponse('getAdminOverview', []);
   },
-  getTrips: (filters?: any) => callMOS('getTrips', [filters]),
-  getBranches: () => callMOS('getBranches'),
-  getVehicles: () => callMOS('getVehicles'),
-  getCrew: () => callMOS('getCrew'),
-  getRevenueSummary: () => callMOS('getRevenueSummary'),
-  getTrustScores: () => callMOS('getTrustScores'),
-  getSettings: () => callMOS('getSettings'),
-  getSMSMetrics: () => callMOS('getSMSMetrics'),
   
+  /**
+   * Retrieves operational trip logs.
+   */
+  getTrips: async (filters?: any): Promise<Trip[]> => {
+    const data = await apiCall('/trips');
+    return data || getSimulatedResponse('getTrips', [filters]);
+  },
+  
+  /**
+   * Retrieves branch-level resource allocation.
+   */
+  getBranches: async (): Promise<Branch[]> => {
+    const data = await apiCall('/branches');
+    return data || getSimulatedResponse('getBranches', []);
+  },
+  
+  /**
+   * Monitors real-time fleet status.
+   */
+  getVehicles: async (): Promise<Vehicle[]> => {
+    const data = await apiCall('/vehicles');
+    return data || getSimulatedResponse('getVehicles', []);
+  },
+  
+  /**
+   * Accesses the personnel and trust registry.
+   */
+  getCrew: async (): Promise<CrewMember[]> => {
+    const data = await apiCall('/crew');
+    return data || getSimulatedResponse('getCrew', []);
+  },
+  
+  /**
+   * Audits daily revenue and distribution.
+   */
+  getRevenueSummary: async (): Promise<RevenueSummary> => {
+    const data = await apiCall('/revenue');
+    return data || getSimulatedResponse('getRevenueSummary', []);
+  },
+  
+  /**
+   * Queries behavioral trust indices from the integrity engine.
+   */
+  getTrustScores: async (): Promise<any> => {
+    const data = await apiCall('/trust');
+    return data || getSimulatedResponse('getTrustScores', []);
+  },
+  
+  /**
+   * Fetches current SACCO operational configurations.
+   */
+  getSettings: async (): Promise<SaccoSettings> => {
+    const data = await apiCall('/settings');
+    return data || getSimulatedResponse('getSettings', []);
+  },
+  
+  /**
+   * Analyzes communication costs and delivery metrics.
+   */
+  getSMSMetrics: async (): Promise<SMSMetrics> => {
+    const data = await apiCall('/sms');
+    return data || getSimulatedResponse('getSMSMetrics', []);
+  },
+  
+  /**
+   * Dispatches an operational intent to the Core.
+   */
   dispatch: async (intent: string, payload: any): Promise<{ success: boolean; message: string }> => {
-    return callMOS('dispatch', [intent, payload]);
+    const data = await apiCall('/dispatch', {
+      method: 'POST',
+      body: JSON.stringify({ intent, payload })
+    });
+    return data || getSimulatedResponse('dispatch', [intent, payload]);
+  },
+
+  /**
+   * Checks Core health status as defined in deployment params.
+   */
+  checkCore: async () => {
+    const data = await apiCall('/health');
+    return data;
   }
 };
 
+/**
+ * Standard Simulation Logic.
+ * Provides consistent data structures when the Core API is unreachable.
+ */
 function getSimulatedResponse(method: string, params: any[]) {
-  bridgeActive = false;
+  // Ensure the UI knows we are in simulation
+  coreConnected = false; 
+  
   switch (method) {
     case 'getAdminOverview':
       return {

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { mosClient } from '../services/mosClient';
 import { AdminOverview } from '../types';
-import { TrendingUp, Users, Bus, ShieldCheck, AlertTriangle, Activity, Zap, Clock } from 'lucide-react';
+import { TrendingUp, Users, Bus, ShieldCheck, AlertTriangle, Activity, Zap, Clock, Globe, CheckCircle, XCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string }> = ({ title, value, icon, color }) => (
@@ -18,9 +18,28 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
 export const Dashboard: React.FC = () => {
   const [data, setData] = useState<AdminOverview | null>(null);
   const [events, setEvents] = useState<{ id: string, name: string, time: string, desc: string }[]>([]);
+  const [health, setHealth] = useState<{ status: 'checking' | 'connected' | 'failed', message?: string }>({ status: 'checking' });
 
   useEffect(() => {
+    // Initial data fetch
     mosClient.getAdminOverview().then(setData);
+
+    // Explicit Health Check to MOS Core
+    const runHealthCheck = async () => {
+      try {
+        const healthData = await mosClient.checkCore();
+        if (healthData) {
+          setHealth({ status: 'connected', message: healthData.status || 'Systems Operational' });
+        } else {
+          setHealth({ status: 'failed', message: 'Core Unreachable (Simulation Active)' });
+        }
+      } catch (err) {
+        setHealth({ status: 'failed', message: 'Connection Refused' });
+      }
+    };
+
+    runHealthCheck();
+    const healthInterval = setInterval(runHealthCheck, 10000);
 
     // Initial mock events
     setEvents([
@@ -29,39 +48,35 @@ export const Dashboard: React.FC = () => {
       { id: '3', name: 'SHIFT_START', time: '14:00', desc: '4 crew onboarded - Westside' }
     ]);
 
-    // Listen for real MOS_EVENT from bridge
-    const handleMosEvent = (event: MessageEvent) => {
-      if (event.data.type === 'MOS_EVENT') {
-        const { eventName, data: eventData } = event.data;
-        const newEvent = {
-          id: Math.random().toString(36).substr(2, 9),
-          name: eventName,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          desc: JSON.stringify(eventData).substring(0, 40)
-        };
-        setEvents(prev => [newEvent, ...prev].slice(0, 10));
-      }
-    };
-    window.addEventListener('message', handleMosEvent);
-    return () => window.removeEventListener('message', handleMosEvent);
+    return () => clearInterval(healthInterval);
   }, []);
 
   if (!data) return <div className="p-12 text-center animate-pulse text-slate-400 font-bold">Synchronising with MOS Core...</div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">System Status</h1>
           <p className="text-slate-500 text-sm">Real-time performance metrics computed by MOS Core engine.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(data.branchStatus).map(([name, status]) => (
-            <div key={name} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-black uppercase tracking-tighter">
-              <span className={`w-2 h-2 rounded-full ${status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-              {name}: {status}
+        
+        {/* Core Diagnostics Panel */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm min-w-[280px]">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            health.status === 'connected' ? 'bg-emerald-50 text-emerald-600' : 
+            health.status === 'failed' ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'
+          }`}>
+            {health.status === 'connected' ? <CheckCircle size={20} /> : 
+             health.status === 'failed' ? <XCircle size={20} /> : <Activity size={20} className="animate-spin" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Core Diagnostic</span>
+              {health.status === 'connected' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
             </div>
-          ))}
+            <p className="text-xs font-bold text-slate-700 truncate max-w-[180px]">{health.message || 'Probing v1/health...'}</p>
+          </div>
         </div>
       </div>
 
