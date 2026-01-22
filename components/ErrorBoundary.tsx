@@ -1,11 +1,12 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+
+import React, { ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 interface Props { children: ReactNode; }
 interface State { hasError: boolean; error: Error | null; }
 
-// Use the imported Component class directly to ensure proper type inheritance of 'props' and other members
-export class GlobalErrorBoundary extends Component<Props, State> {
+// Fix: Use React.Component explicitly to ensure proper type inheritance and visibility of 'props'
+export class GlobalErrorBoundary extends React.Component<Props, State> {
   public state: State = { hasError: false, error: null };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -40,7 +41,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
       );
     }
 
-    // Access children from this.props which is now correctly identified via explicit inheritance from Component<Props, State>
+    // Fix: Access children from this.props which is now correctly resolved via React.Component inheritance
     return this.props.children;
   }
 }
