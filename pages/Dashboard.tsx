@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { mosClient, parseCoreResponse } from '../services/mosClient';
+import { mosClient, unwrapCoreData, safeCurrency, safeNumber } from '../services/mosClient';
 import { AdminOverview, CoreSyncState } from '../types';
 import { 
   TrendingUp, Users, Bus, ShieldCheck, AlertTriangle, 
@@ -8,20 +8,6 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { CoreStatusBanner } from '../components/CoreStatusBanner';
-
-/**
- * Defensive Formatters
- * Guaranteed never to crash on undefined/null.
- */
-const safeCurrency = (val: number | undefined | null, locale = 'en-KE') => {
-  const value = val ?? 0;
-  return `KES ${value.toLocaleString(locale, { minimumFractionDigits: 0 })}`;
-};
-
-const safeNumber = (val: number | undefined | null) => {
-  const value = val ?? 0;
-  return value.toLocaleString();
-};
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string; disabled?: boolean }> = ({ title, value, icon, color, disabled }) => (
   <div className={`bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all ${disabled ? 'opacity-40 grayscale' : 'hover:shadow-md'}`}>
@@ -39,12 +25,11 @@ export const Dashboard: React.FC = () => {
   const [lastSync, setLastSync] = useState<string>('');
 
   const performSync = useCallback(async () => {
-    // Phase 4: Snapshot-First. Keep current data if syncing fails.
     const res = await mosClient.getAdminOverview();
-    const parsed = parseCoreResponse(res);
+    // Unwrap the CoreResponse envelope correctly
+    const unwrappedData = unwrapCoreData(res, setSyncState);
     
-    if (parsed.data) setData(parsed.data);
-    setSyncState(parsed.syncState);
+    if (unwrappedData) setData(unwrappedData);
     setLastSync(new Date().toISOString());
   }, []);
 
@@ -54,7 +39,6 @@ export const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [performSync]);
 
-  // Phase 3: Block unsafe rendering if still initial syncing
   if (syncState === 'SYNCING' && !data) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-pulse">
@@ -74,7 +58,6 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-0 -m-8">
-      {/* Explicit Status Banner */}
       <CoreStatusBanner state={syncState} lastSync={lastSync} />
 
       <div className="p-8 space-y-8 animate-in fade-in duration-500">
@@ -93,7 +76,6 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Resilience Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
           <StatCard 
             title="Total Revenue" 
@@ -192,16 +174,6 @@ export const Dashboard: React.FC = () => {
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Recent</span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium truncate">State Registry Synchronized.</p>
-                </div>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-3 opacity-60">
-                <div className="mt-1 w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit Event</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">2m ago</span>
-                  </div>
-                  <p className="text-xs text-slate-500 font-medium truncate">Fidelity check completed.</p>
                 </div>
               </div>
             </div>

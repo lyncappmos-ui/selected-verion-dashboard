@@ -54,7 +54,9 @@ export function parseCoreResponse<T>(response: CoreResponse<T> | null): { data: 
 
 /**
  * unwrapCoreData Utility
- * The single authoritative way to extract data from a CoreResponse for React state.
+ * The single authoritative way to extract data T from a CoreResponse<T> for React state.
+ * @param response The CoreResponse envelope from the API
+ * @param onState Optional callback to update UI sync state
  */
 export function unwrapCoreData<T>(
   response: CoreResponse<T> | null,

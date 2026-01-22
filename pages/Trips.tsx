@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { mosClient, parseCoreResponse, safeCurrency } from '../services/mosClient';
+import { mosClient, unwrapCoreData, safeCurrency } from '../services/mosClient';
 import { Trip, CoreSyncState } from '../types';
 import { Search, Filter, Play, Eye, MoreHorizontal, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
@@ -11,9 +11,8 @@ export const Trips: React.FC = () => {
 
   const fetchTrips = useCallback(async () => {
     const res = await mosClient.getTrips();
-    const { data, syncState } = parseCoreResponse(res);
+    const data = unwrapCoreData(res, setSyncState);
     if (data) setTrips(data);
-    setSyncState(syncState);
   }, []);
 
   useEffect(() => {
@@ -25,7 +24,7 @@ export const Trips: React.FC = () => {
     setFeedback(null);
     try {
       const res = await mosClient.dispatch('dispatchTrip', { tripId });
-      const { data } = parseCoreResponse(res);
+      const data = unwrapCoreData(res);
       if (data?.success) {
         setFeedback({ type: 'success', message: data.message });
         setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'active' } : t));
@@ -46,13 +45,13 @@ export const Trips: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400">
         <Clock className="animate-spin mb-4" size={32} />
-        <p className="text-sm font-bold uppercase tracking-widest">Synchronizing Operational Log...</p>
+        <p className="text-sm font-bold uppercase tracking-widest text-center">Synchronizing Operational Log...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Operational Log</h1>
@@ -64,7 +63,7 @@ export const Trips: React.FC = () => {
               Read Only Mode
             </div>
           )}
-          <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all">
+          <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
             <Filter size={16} /> Filters
           </button>
           <button 
@@ -86,17 +85,6 @@ export const Trips: React.FC = () => {
       )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="Filter by Trip ID, Vehicle or Route..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
-            />
-          </div>
-        </div>
-
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -111,7 +99,9 @@ export const Trips: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {trips.map((trip) => (
+              {trips.length === 0 ? (
+                <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400">No active operational logs.</td></tr>
+              ) : trips.map((trip) => (
                 <tr key={trip.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-5 font-mono font-bold text-blue-600">{trip.id}</td>
                   <td className="px-6 py-5 font-semibold text-slate-700">{trip.route}</td>
