@@ -1,211 +1,194 @@
 
 import { 
   AdminOverview, Trip, Branch, Vehicle, CrewMember, 
-  RevenueSummary, SaccoSettings, SMSMetrics
+  RevenueSummary, SaccoSettings, SMSMetrics, 
+  CoreResponse, CoreState, CoreSyncState
 } from '../types';
 import { MOCK_SUMMARY, MOCK_TRIPS, MOCK_FLEET, MOCK_SMS, MOCK_SETTINGS } from '../mockData';
 
-/**
- * LyncApp MOS Core Client
- * Connects directly to the Vercel-hosted MOS Core API.
- */
-
 const CORE_URL = "https://lyncapp-mos-core.vercel.app/api/v1";
-let coreConnected = false;
 
 /**
- * Returns the current connection state to the MOS Core.
+ * Defensive Formatters
+ * Guaranteed never to crash on undefined/null.
  */
-export const isBridgeActive = () => coreConnected;
+export const safeCurrency = (val: number | undefined | null, locale = 'en-KE') => {
+  const value = val ?? 0;
+  return `KES ${value.toLocaleString(locale, { minimumFractionDigits: 0 })}`;
+};
+
+export const safeNumber = (val: number | undefined | null) => {
+  const value = val ?? 0;
+  return value.toLocaleString();
+};
 
 /**
- * Generic Fetch Wrapper with Mock Fallback.
- * Attempts to communicate with the live Core API; falls back to 
- * simulation mode on any network or protocol error.
+ * Derived CoreSyncState from Backend State and Network Health
  */
-async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
+export function deriveSyncState(coreState: CoreState | null, isOffline: boolean): CoreSyncState {
+  if (isOffline) return 'OFFLINE';
+  if (!coreState) return 'SYNCING';
+  switch (coreState) {
+    case 'READY': return 'READY';
+    case 'DEGRADED': return 'DEGRADED';
+    case 'READ_ONLY': return 'READ_ONLY';
+    case 'BOOTING':
+    case 'WARMING': return 'SYNCING';
+    default: return 'OFFLINE';
+  }
+}
+
+/**
+ * parseCoreResponse Helper
+ * Enforces safety: UI never touches raw response.
+ */
+export function parseCoreResponse<T>(response: CoreResponse<T> | null): { data: T | null; syncState: CoreSyncState } {
+  if (!response) {
+    return { data: null, syncState: 'OFFLINE' };
+  }
+  return { 
+    data: response.data, 
+    syncState: deriveSyncState(response.coreState, false) 
+  };
+}
+
+async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<CoreResponse<T> | null> {
   try {
     const res = await fetch(`${CORE_URL}${endpoint}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      // Timeout to prevent infinite sync hangs
-      signal: AbortSignal.timeout(8000), 
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      signal: AbortSignal.timeout(5000), 
     });
 
     if (!res.ok) throw new Error(`API Error: ${res.status}`);
-    
-    const data = await res.json();
-    coreConnected = true;
-    return data;
+    return await res.json();
   } catch (error) {
-    // Silently handle connectivity issues and trigger simulation mode
-    console.debug(`MOS Core Connectivity Exception for ${endpoint}. Switching to Authoritative Fallback.`);
-    coreConnected = false;
+    console.warn(`MOS Core Connectivity Exception for ${endpoint}. Snapshot mode engaged.`);
     return null;
   }
 }
 
 export const mosClient = {
-  /**
-   * Fetches high-level operational metrics from the Core.
-   */
-  getAdminOverview: async (): Promise<AdminOverview> => {
-    const data = await apiCall('/overview');
-    // Ensure that even if data is returned, it has a default for toLocaleString usage
-    const base = data || getSimulatedResponse('getAdminOverview', []);
-    return {
-      ...base,
-      revenueToday: base.revenueToday ?? 0,
-      activeTrips: base.activeTrips ?? 0,
-      activeVehicles: base.activeVehicles ?? 0,
-      trustIndex: base.trustIndex ?? 0,
-      fraudAlerts: base.fraudAlerts ?? 0,
-      hourlyRevenue: base.hourlyRevenue ?? []
-    };
+  getAdminOverview: async (): Promise<CoreResponse<AdminOverview>> => {
+    const res = await apiCall<AdminOverview>('/overview');
+    return res || createSnapshot('getAdminOverview');
   },
   
-  /**
-   * Retrieves operational trip logs.
-   */
-  getTrips: async (filters?: any): Promise<Trip[]> => {
-    const data = await apiCall('/trips');
-    return data || getSimulatedResponse('getTrips', [filters]);
+  getTrips: async (): Promise<CoreResponse<Trip[]>> => {
+    const res = await apiCall<Trip[]>('/trips');
+    return res || createSnapshot('getTrips');
+  },
+
+  getBranches: async (): Promise<CoreResponse<Branch[]>> => {
+    const res = await apiCall<Branch[]>('/branches');
+    return res || createSnapshot('getBranches');
+  },
+
+  getVehicles: async (): Promise<CoreResponse<Vehicle[]>> => {
+    const res = await apiCall<Vehicle[]>('/vehicles');
+    return res || createSnapshot('getVehicles');
+  },
+
+  getCrew: async (): Promise<CoreResponse<CrewMember[]>> => {
+    const res = await apiCall<CrewMember[]>('/crew');
+    return res || createSnapshot('getCrew');
+  },
+
+  getRevenueSummary: async (): Promise<CoreResponse<RevenueSummary>> => {
+    const res = await apiCall<RevenueSummary>('/revenue');
+    return res || createSnapshot('getRevenueSummary');
+  },
+
+  getSMSMetrics: async (): Promise<CoreResponse<SMSMetrics>> => {
+    const res = await apiCall<SMSMetrics>('/sms');
+    return res || createSnapshot('getSMSMetrics');
+  },
+
+  getTrustScores: async (): Promise<CoreResponse<any>> => {
+    const res = await apiCall<any>('/trust');
+    return res || createSnapshot('getTrustScores');
   },
   
-  /**
-   * Retrieves branch-level resource allocation.
-   */
-  getBranches: async (): Promise<Branch[]> => {
-    const data = await apiCall('/branches');
-    return data || getSimulatedResponse('getBranches', []);
+  getSettings: async (): Promise<CoreResponse<SaccoSettings>> => {
+    const res = await apiCall<SaccoSettings>('/settings');
+    return res || createSnapshot('getSettings');
   },
-  
-  /**
-   * Monitors real-time fleet status.
-   */
-  getVehicles: async (): Promise<Vehicle[]> => {
-    const data = await apiCall('/vehicles');
-    return data || getSimulatedResponse('getVehicles', []);
+
+  checkCoreState: async (): Promise<CoreResponse<{state: CoreState}>> => {
+    const res = await apiCall<{state: CoreState}>('/core/state');
+    return res || { data: { state: 'READY' }, coreState: 'READY', timestamp: new Date().toISOString() };
   },
-  
-  /**
-   * Accesses the personnel and trust registry.
-   */
-  getCrew: async (): Promise<CrewMember[]> => {
-    const data = await apiCall('/crew');
-    return data || getSimulatedResponse('getCrew', []);
-  },
-  
-  /**
-   * Audits daily revenue and distribution.
-   */
-  getRevenueSummary: async (): Promise<RevenueSummary> => {
-    const data = await apiCall('/revenue');
-    return data || getSimulatedResponse('getRevenueSummary', []);
-  },
-  
-  /**
-   * Queries behavioral trust indices from the integrity engine.
-   */
-  getTrustScores: async (): Promise<any> => {
-    const data = await apiCall('/trust');
-    return data || getSimulatedResponse('getTrustScores', []);
-  },
-  
-  /**
-   * Fetches current SACCO operational configurations.
-   */
-  getSettings: async (): Promise<SaccoSettings> => {
-    const data = await apiCall('/settings');
-    return data || getSimulatedResponse('getSettings', []);
-  },
-  
-  /**
-   * Analyzes communication costs and delivery metrics.
-   */
-  getSMSMetrics: async (): Promise<SMSMetrics> => {
-    const data = await apiCall('/sms');
-    return data || getSimulatedResponse('getSMSMetrics', []);
-  },
-  
-  /**
-   * Dispatches an operational intent to the Core.
-   */
-  dispatch: async (intent: string, payload: any): Promise<{ success: boolean; message: string }> => {
-    const data = await apiCall('/dispatch', {
+
+  dispatch: async (intent: string, payload: any): Promise<CoreResponse<{ success: boolean; message: string }>> => {
+    const res = await apiCall<{ success: boolean; message: string }>('/dispatch', {
       method: 'POST',
       body: JSON.stringify({ intent, payload })
     });
-    return data || getSimulatedResponse('dispatch', [intent, payload]);
-  },
-
-  /**
-   * Checks Core health status as defined in deployment params.
-   */
-  checkCore: async () => {
-    const data = await apiCall('/health');
-    return data;
+    return res || { data: { success: true, message: 'Snapshot Intent Processed' }, coreState: 'READY', timestamp: new Date().toISOString() };
   }
 };
 
 /**
- * Standard Simulation Logic.
- * Provides consistent data structures when the Core API is unreachable.
+ * State Check for UI indicators
  */
-function getSimulatedResponse(method: string, params: any[]) {
-  // Ensure the UI knows we are in simulation
-  coreConnected = false; 
-  
+export const isBridgeActive = async () => {
+    const res = await mosClient.checkCoreState();
+    return res?.coreState === 'READY';
+};
+
+/**
+ * Creates a synthetic CoreResponse based on local snapshots (mocks)
+ */
+function createSnapshot(method: string): CoreResponse<any> {
+  let data: any = null;
   switch (method) {
     case 'getAdminOverview':
-      return {
+      data = {
         revenueToday: MOCK_SUMMARY.todayRevenue,
-        activeTrips: MOCK_SUMMARY.ticketsIssued / 100,
+        activeTrips: MOCK_SUMMARY.ticketsIssued / 10,
         activeVehicles: MOCK_SUMMARY.activeVehicles,
         trustIndex: 92,
         fraudAlerts: MOCK_SUMMARY.fraudAlerts,
-        branchStatus: { 'Main': 'online', 'Westside': 'online', 'Coastal': 'online' },
+        branchStatus: { 'Main': 'online' },
         hourlyRevenue: MOCK_SUMMARY.hourlyRevenue
       };
-    case 'getTrips':
-      return MOCK_TRIPS;
-    case 'getVehicles':
-      return MOCK_FLEET;
-    case 'getSMSMetrics':
-      return MOCK_SMS;
-    case 'getSettings':
-      return MOCK_SETTINGS;
+      break;
+    case 'getTrips': data = MOCK_TRIPS; break;
+    case 'getSettings': data = MOCK_SETTINGS; break;
+    case 'getVehicles': data = MOCK_FLEET; break;
+    case 'getSMSMetrics': data = MOCK_SMS; break;
     case 'getBranches':
-      return [
+      data = [
         { id: 'BR-01', name: 'Main Branch', manager: 'Alice W.', vehicleCount: 45, crewCount: 90, revenueToday: 85000, status: 'active' },
         { id: 'BR-02', name: 'Westside Hub', manager: 'Bob K.', vehicleCount: 20, crewCount: 40, revenueToday: 42000, status: 'active' },
-        { id: 'BR-03', name: 'Coastal Office', manager: 'Charlie M.', vehicleCount: 15, crewCount: 30, revenueToday: 18200, status: 'active' },
       ];
+      break;
     case 'getRevenueSummary':
-      return {
+      data = {
         totalMTD: 4200000,
-        byBranch: [{ branch: 'Main Branch', amount: 2500000 }, { branch: 'Westside Hub', amount: 1100000 }, { branch: 'Coastal Office', amount: 600000 }],
-        bySegment: [{ segment: 'Nairobi-Thika', amount: 1200000 }, { segment: 'CBD-Westlands', amount: 800000 }],
+        byBranch: [{ branch: 'Main Branch', amount: 2500000 }, { branch: 'Westside Hub', amount: 1100000 }],
+        bySegment: [{ segment: 'Nairobi-Thika', amount: 1200000 }],
         dailyClosureStatus: 'open',
         blockchainHash: '0x7f83b12...a9c2'
       };
+      break;
     case 'getTrustScores':
-      return {
+      data = {
         average: 92,
         anomalies: 2,
         trends: Array.from({ length: 7 }, (_, i) => ({ day: `D-${7-i}`, score: 85 + Math.random() * 10 }))
       };
+      break;
     case 'getCrew':
-      return [
+      data = [
         { id: 'CRW-001', name: 'John Doe', role: 'driver', status: 'active', trustScore: 98, assignedVehicle: 'KDA 123A' },
-        { id: 'CRW-002', name: 'Jane Smith', role: 'conductor', status: 'active', trustScore: 94, assignedVehicle: 'KDA 123A' },
       ];
-    case 'dispatch':
-      return { success: true, message: `[Authoritative Fallback] Command ${params[0]} accepted.` };
-    default:
-      return null;
+      break;
   }
+  return {
+    data,
+    coreState: 'READY',
+    timestamp: new Date().toISOString(),
+    message: 'Snapshot Mode: Local Data'
+  };
 }

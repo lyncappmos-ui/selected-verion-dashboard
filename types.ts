@@ -3,6 +3,26 @@ export type TripStatus = 'scheduled' | 'active' | 'completed' | 'cancelled';
 export type VehicleStatus = 'active' | 'maintenance' | 'idle' | 'offline';
 export type CrewRole = 'driver' | 'conductor' | 'supervisor';
 
+/** 
+ * MOS Core Backend States
+ */
+export type CoreState = 'BOOTING' | 'WARMING' | 'READY' | 'DEGRADED' | 'READ_ONLY';
+
+/**
+ * Client-side Sync States
+ */
+export type CoreSyncState = 'SYNCING' | 'READY' | 'DEGRADED' | 'READ_ONLY' | 'OFFLINE';
+
+/**
+ * Standard API Envelope from MOS Core
+ */
+export interface CoreResponse<T> {
+  data: T | null;
+  coreState: CoreState;
+  timestamp: string;
+  message?: string;
+}
+
 export interface Branch {
   id: string;
   name: string;
@@ -80,9 +100,6 @@ export interface SaccoSettings {
   };
 }
 
-/**
- * Added DashboardSummary interface to resolve import errors in mockData and api services.
- */
 export interface DashboardSummary {
   todayRevenue: number;
   ticketsIssued: number;
@@ -93,9 +110,6 @@ export interface DashboardSummary {
   routePerformance: any[];
 }
 
-/**
- * Added SMSMetrics interface to resolve import errors in mockData, api, and SMS pages.
- */
 export interface SMSMetrics {
   sent: number;
   failed: number;

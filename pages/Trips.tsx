@@ -1,27 +1,35 @@
 
-import React, { useEffect, useState } from 'react';
-import { mosClient } from '../services/mosClient';
-import { Trip } from '../types';
-import { Search, Filter, Play, Eye, MoreHorizontal, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { mosClient, parseCoreResponse, safeCurrency } from '../services/mosClient';
+import { Trip, CoreSyncState } from '../types';
+import { Search, Filter, Play, Eye, MoreHorizontal, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
 export const Trips: React.FC = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [syncState, setSyncState] = useState<CoreSyncState>('SYNCING');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
-  useEffect(() => {
-    mosClient.getTrips().then(res => {
-      setTrips(res);
-      setLoading(false);
-    });
+  const fetchTrips = useCallback(async () => {
+    const res = await mosClient.getTrips();
+    const { data, syncState } = parseCoreResponse(res);
+    if (data) setTrips(data);
+    setSyncState(syncState);
   }, []);
 
+  useEffect(() => {
+    fetchTrips();
+  }, [fetchTrips]);
+
   const handleDispatch = async (tripId: string) => {
+    if (syncState === 'READ_ONLY') return;
     setFeedback(null);
     try {
       const res = await mosClient.dispatch('dispatchTrip', { tripId });
-      setFeedback({ type: 'success', message: res.message });
-      setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'active' } : t));
+      const { data } = parseCoreResponse(res);
+      if (data?.success) {
+        setFeedback({ type: 'success', message: data.message });
+        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: 'active' } : t));
+      }
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -34,6 +42,15 @@ export const Trips: React.FC = () => {
     cancelled: 'bg-rose-50 text-rose-600',
   };
 
+  if (syncState === 'SYNCING' && trips.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400">
+        <Clock className="animate-spin mb-4" size={32} />
+        <p className="text-sm font-bold uppercase tracking-widest">Synchronizing Operational Log...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -42,10 +59,18 @@ export const Trips: React.FC = () => {
           <p className="text-slate-500 text-sm">Monitor system-authorized trips and manage operational intents.</p>
         </div>
         <div className="flex gap-2">
+          {syncState === 'READ_ONLY' && (
+            <div className="bg-slate-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+              Read Only Mode
+            </div>
+          )}
           <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all">
             <Filter size={16} /> Filters
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-blue-700 transition-all">
+          <button 
+            disabled={syncState === 'READ_ONLY'}
+            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-blue-700 transition-all disabled:opacity-30"
+          >
             Create Trip Intent
           </button>
         </div>
@@ -86,11 +111,7 @@ export const Trips: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {loading ? (
-                [...Array(3)].map((_, i) => (
-                  <tr key={i} className="animate-pulse"><td colSpan={7} className="px-6 py-6"><div className="h-6 bg-slate-100 rounded"></div></td></tr>
-                ))
-              ) : trips.map((trip) => (
+              {trips.map((trip) => (
                 <tr key={trip.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-5 font-mono font-bold text-blue-600">{trip.id}</td>
                   <td className="px-6 py-5 font-semibold text-slate-700">{trip.route}</td>
@@ -101,7 +122,7 @@ export const Trips: React.FC = () => {
                       {trip.status}
                     </span>
                   </td>
-                  <td className="px-6 py-5 font-bold text-slate-800">KES {trip.revenue.toLocaleString()}</td>
+                  <td className="px-6 py-5 font-bold text-slate-800">{safeCurrency(trip.revenue)}</td>
                   <td className="px-6 py-5">
                     <div className="flex justify-center gap-2">
                       <button className="p-2 text-slate-300 hover:text-blue-600 bg-white border border-slate-100 rounded-lg transition-all shadow-sm">
@@ -110,7 +131,8 @@ export const Trips: React.FC = () => {
                       {trip.status === 'scheduled' && (
                         <button 
                           onClick={() => handleDispatch(trip.id)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md flex items-center gap-1.5"
+                          disabled={syncState === 'READ_ONLY'}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md flex items-center gap-1.5 disabled:opacity-30"
                         >
                           <Play size={12} fill="currentColor" /> Dispatch
                         </button>
