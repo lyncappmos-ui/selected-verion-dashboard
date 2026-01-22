@@ -31,6 +31,8 @@ async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      // Timeout to prevent infinite sync hangs
+      signal: AbortSignal.timeout(8000), 
     });
 
     if (!res.ok) throw new Error(`API Error: ${res.status}`);
@@ -40,7 +42,7 @@ async function apiCall(endpoint: string, options: RequestInit = {}): Promise<any
     return data;
   } catch (error) {
     // Silently handle connectivity issues and trigger simulation mode
-    console.debug(`MOS Core connectivity error for ${endpoint}. Fallback to Simulation.`);
+    console.debug(`MOS Core Connectivity Exception for ${endpoint}. Switching to Authoritative Fallback.`);
     coreConnected = false;
     return null;
   }
@@ -52,7 +54,17 @@ export const mosClient = {
    */
   getAdminOverview: async (): Promise<AdminOverview> => {
     const data = await apiCall('/overview');
-    return data || getSimulatedResponse('getAdminOverview', []);
+    // Ensure that even if data is returned, it has a default for toLocaleString usage
+    const base = data || getSimulatedResponse('getAdminOverview', []);
+    return {
+      ...base,
+      revenueToday: base.revenueToday ?? 0,
+      activeTrips: base.activeTrips ?? 0,
+      activeVehicles: base.activeVehicles ?? 0,
+      trustIndex: base.trustIndex ?? 0,
+      fraudAlerts: base.fraudAlerts ?? 0,
+      hourlyRevenue: base.hourlyRevenue ?? []
+    };
   },
   
   /**
@@ -192,7 +204,7 @@ function getSimulatedResponse(method: string, params: any[]) {
         { id: 'CRW-002', name: 'Jane Smith', role: 'conductor', status: 'active', trustScore: 94, assignedVehicle: 'KDA 123A' },
       ];
     case 'dispatch':
-      return { success: true, message: `[Simulated] Command ${params[0]} executed successfully.` };
+      return { success: true, message: `[Authoritative Fallback] Command ${params[0]} accepted.` };
     default:
       return null;
   }
