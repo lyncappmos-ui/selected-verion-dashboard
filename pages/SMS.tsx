@@ -1,17 +1,34 @@
 
-import React, { useEffect, useState } from 'react';
-import { mosClient } from '../services/mosClient';
-import { SMSMetrics } from '../types';
-import { MessageSquare, AlertCircle, Info } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { mosClient, unwrapCoreData } from '../services/mosClient';
+import { SMSMetrics, CoreSyncState } from '../types';
+import { MessageSquare, AlertCircle, Info, Clock } from 'lucide-react';
 
 export const SMSDashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<SMSMetrics | null>(null);
+  const [syncState, setSyncState] = useState<CoreSyncState>('SYNCING');
 
-  useEffect(() => {
-    mosClient.getSMSMetrics().then(setMetrics);
+  const fetchSMS = useCallback(async () => {
+    const response = await mosClient.getSMSMetrics();
+    const data = unwrapCoreData(response, setSyncState);
+    if (data) setMetrics(data);
   }, []);
 
-  if (!metrics) return <div className="p-12 text-center animate-pulse text-slate-400 font-bold">Querying Communication Ledger...</div>;
+  useEffect(() => {
+    fetchSMS();
+  }, [fetchSMS]);
+
+  if (syncState === 'SYNCING' && !metrics) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400">
+        <Clock className="animate-spin mb-4" size={32} />
+        <p className="text-sm font-bold uppercase tracking-widest text-center">Querying Communication Ledger...</p>
+      </div>
+    );
+  }
+
+  // Safe fallback if metrics are null after sync
+  const safeMetrics = metrics || { sent: 0, successRate: 0, totalCost: 0, costPerTicket: 0, failed: 0 };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -21,26 +38,26 @@ export const SMSDashboard: React.FC = () => {
           <p className="text-slate-500 text-sm">Monitor automated system communication efficiency and budgets.</p>
         </div>
         <div className="bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">
-          Quota: 42,400 Units Remaining
+          Quota Status: {syncState === 'OFFLINE' ? 'SNAPSHOT' : 'LIVE'}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Total Sent</p>
-          <p className="text-3xl font-bold text-slate-800 tracking-tighter">{metrics.sent.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-slate-800 tracking-tighter">{safeMetrics.sent.toLocaleString()}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Delivery Success</p>
-          <p className="text-3xl font-bold text-emerald-600 tracking-tighter">{metrics.successRate}%</p>
+          <p className="text-3xl font-bold text-emerald-600 tracking-tighter">{safeMetrics.successRate}%</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Total Cost (MTD)</p>
-          <p className="text-3xl font-bold text-slate-800 tracking-tighter">KES {metrics.totalCost.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-slate-800 tracking-tighter">KES {safeMetrics.totalCost.toLocaleString()}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-b-4 border-b-blue-600">
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Avg Cost / Unit</p>
-          <p className="text-3xl font-bold text-blue-600 tracking-tighter">KES {metrics.costPerTicket}</p>
+          <p className="text-3xl font-bold text-blue-600 tracking-tighter">KES {safeMetrics.costPerTicket}</p>
         </div>
       </div>
 
@@ -64,28 +81,10 @@ export const SMSDashboard: React.FC = () => {
             <div>
               <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                 <span>Successful Handover</span>
-                <span className="text-emerald-600">98.5%</span>
+                <span className="text-emerald-600">{safeMetrics.successRate}%</span>
               </div>
               <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                <div className="h-full bg-emerald-500 rounded-full w-[98.5%] shadow-sm"></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                <span>Network Failure</span>
-                <span className="text-rose-600">1.2%</span>
-              </div>
-              <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                <div className="h-full bg-rose-500 rounded-full w-[1.2%]"></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                <span>Queued / Pending</span>
-                <span className="text-blue-600">0.3%</span>
-              </div>
-              <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                <div className="h-full bg-blue-600 rounded-full w-[0.3%]"></div>
+                <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${safeMetrics.successRate}%` }}></div>
               </div>
             </div>
           </div>

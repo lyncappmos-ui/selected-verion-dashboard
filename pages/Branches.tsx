@@ -1,18 +1,34 @@
 
-import React, { useEffect, useState } from 'react';
-import { mosClient } from '../services/mosClient';
-import { Branch } from '../types';
-import { Building2, Users, Bus, ArrowRight, Activity } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { mosClient, unwrapCoreData } from '../services/mosClient';
+import { Branch, CoreSyncState } from '../types';
+import { Building2, Users, Bus, ArrowRight, Clock } from 'lucide-react';
 
 export const Branches: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [syncState, setSyncState] = useState<CoreSyncState>('SYNCING');
 
-  useEffect(() => {
-    mosClient.getBranches().then(setBranches);
+  const fetchBranches = useCallback(async () => {
+    const response = await mosClient.getBranches();
+    const data = unwrapCoreData(response, setSyncState);
+    if (data) setBranches(data);
   }, []);
 
+  useEffect(() => {
+    fetchBranches();
+  }, [fetchBranches]);
+
+  if (syncState === 'SYNCING' && branches.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400">
+        <Clock className="animate-spin mb-4" size={32} />
+        <p className="text-sm font-bold uppercase tracking-widest text-center">Synchronizing Hub Registry...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Branch Operations</h1>
@@ -24,7 +40,9 @@ export const Branches: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {branches.map(b => (
+        {branches.length === 0 ? (
+          <div className="col-span-full py-20 text-center text-slate-400 font-medium">No hubs found in system state.</div>
+        ) : branches.map(b => (
           <div key={b.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all group">
             <div className="flex justify-between items-start mb-6">
               <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-blue-600 group-hover:text-white">

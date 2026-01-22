@@ -18,10 +18,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
   const [coreStatus, setCoreStatus] = useState(false);
 
   useEffect(() => {
-    // Monitor real-time Core status
-    const timer = setInterval(() => {
-      setCoreStatus(isBridgeActive());
-    }, 3000);
+    // Correctly resolve async status check before updating state
+    const checkStatus = async () => {
+      const active = await isBridgeActive();
+      setCoreStatus(active);
+    };
+
+    checkStatus();
+    const timer = setInterval(checkStatus, 10000);
     return () => clearInterval(timer);
   }, []);
 

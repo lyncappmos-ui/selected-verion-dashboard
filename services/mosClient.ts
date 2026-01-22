@@ -40,7 +40,7 @@ export function deriveSyncState(coreState: CoreState | null, isOffline: boolean)
 
 /**
  * parseCoreResponse Helper
- * Enforces safety: UI never touches raw response.
+ * Enforces safety: UI never touches raw response directly.
  */
 export function parseCoreResponse<T>(response: CoreResponse<T> | null): { data: T | null; syncState: CoreSyncState } {
   if (!response) {
@@ -50,6 +50,19 @@ export function parseCoreResponse<T>(response: CoreResponse<T> | null): { data: 
     data: response.data, 
     syncState: deriveSyncState(response.coreState, false) 
   };
+}
+
+/**
+ * unwrapCoreData Utility
+ * The single authoritative way to extract data from a CoreResponse for React state.
+ */
+export function unwrapCoreData<T>(
+  response: CoreResponse<T> | null,
+  onState?: (state: CoreSyncState) => void
+): T | null {
+  const { data, syncState } = parseCoreResponse(response);
+  if (onState) onState(syncState);
+  return data;
 }
 
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<CoreResponse<T> | null> {
@@ -131,7 +144,7 @@ export const mosClient = {
 /**
  * State Check for UI indicators
  */
-export const isBridgeActive = async () => {
+export const isBridgeActive = async (): Promise<boolean> => {
     const res = await mosClient.checkCoreState();
     return res?.coreState === 'READY';
 };

@@ -1,19 +1,22 @@
 
-import React, { useEffect, useState } from 'react';
-import { mosClient } from '../services/mosClient';
-import { Vehicle } from '../types';
-import { Truck, Search, Shield, MapPin, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { mosClient, unwrapCoreData } from '../services/mosClient';
+import { Vehicle, CoreSyncState } from '../types';
+import { Truck, Search, RefreshCw, Clock } from 'lucide-react';
 
 export const Vehicles: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [syncState, setSyncState] = useState<CoreSyncState>('SYNCING');
+
+  const fetchVehicles = useCallback(async () => {
+    const response = await mosClient.getVehicles();
+    const data = unwrapCoreData(response, setSyncState);
+    if (data) setVehicles(data);
+  }, []);
 
   useEffect(() => {
-    mosClient.getVehicles().then(res => {
-      setVehicles(res);
-      setLoading(false);
-    });
-  }, []);
+    fetchVehicles();
+  }, [fetchVehicles]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -25,8 +28,17 @@ export const Vehicles: React.FC = () => {
     }
   };
 
+  if (syncState === 'SYNCING' && vehicles.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400">
+        <Clock className="animate-spin mb-4" size={32} />
+        <p className="text-sm font-bold uppercase tracking-widest text-center">Polling Fleet Telemetry...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Fleet Control</h1>
@@ -43,8 +55,8 @@ export const Vehicles: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          [...Array(3)].map((_, i) => <div key={i} className="h-64 bg-slate-200 rounded-2xl animate-pulse"></div>)
+        {vehicles.length === 0 ? (
+          <div className="col-span-full py-20 text-center text-slate-400 font-medium">No vehicles registered in core state.</div>
         ) : vehicles.map(v => (
           <div key={v.registration} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
             <div className="flex justify-between items-start mb-6">
